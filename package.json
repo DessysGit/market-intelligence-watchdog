@@ -1,6 +1,7 @@
 {
   "name": "market-intelligence-watchdog",
   "version": "1.0.0",
+  "type": "module",
   "description": "An automated, zero-cost pipeline that tracks a competitor's website daily,\r detects meaningful changes, and sends a plain-language summary to Telegram.",
   "main": "index.js",
   "scripts": {

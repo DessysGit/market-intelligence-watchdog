@@ -1,15 +1,20 @@
 // test-neon.js
 // Run with: node test-neon.js
-// Set DATABASE_URL as an environment variable first, or paste it directly
-// below for this quick test (don't commit a real connection string to git —
-// it contains your password).
+// Loads credentials from a local .env file — see .env.example for the format.
 
+import 'dotenv/config';
 import pg from 'pg';
 const { Client } = pg;
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
 async function testNeon() {
+  if (!DATABASE_URL) {
+    console.error('❌ Missing DATABASE_URL.');
+    console.error('   Make sure a .env file exists in this folder with it set (see .env.example).');
+    return;
+  }
+
   const client = new Client({ connectionString: DATABASE_URL });
   await client.connect();
   console.log('✅ Connected to Neon.');
