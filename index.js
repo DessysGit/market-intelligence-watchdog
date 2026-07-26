@@ -79,7 +79,7 @@ the item was ADDED or REMOVED, using those exact words. Ignore anything that loo
 navigation menu text, cookie-banner text, or footer links — focus only on substantive content.
 `;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_API_KEY}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -120,43 +120,40 @@ async function runWatchdog(targetUrl) {
   const client = new Client({ connectionString: DATABASE_URL });
   await client.connect();
 
-  try {
-    // Get previous snapshot from Neon.
-    const result = await client.query(
-      `select last_content from competitor_snapshots where url = $1`,
-      [targetUrl]
-    );
-    const previousContent = result.rows[0] ? result.rows[0].last_content : '';
+  // Get previous snapshot from Neon.
+  const result = await client.query(
+    `select last_content from competitor_snapshots where url = $1`,
+    [targetUrl]
+  );
+  const previousContent = result.rows[0] ? result.rows[0].last_content : '';
 
-    const rawContent = await fetchWebContent(targetUrl);
-    const currentContent = cleanContent(rawContent);
+  const rawContent = await fetchWebContent(targetUrl);
+  const currentContent = cleanContent(rawContent);
 
-    // Compute the diff in code — see computeDiff() comment for why.
-    const { added, removed } = computeDiff(previousContent, currentContent);
+  // Compute the diff in code — see computeDiff() comment for why.
+  const { added, removed } = computeDiff(previousContent, currentContent);
 
-    const summary = await analyzeWithAI(added, removed);
+  const summary = await analyzeWithAI(added, removed);
 
-    const noChange = summary.trim().toLowerCase().startsWith('no major changes detected');
+  const noChange = summary.trim().toLowerCase().startsWith('no major changes detected');
 
-    if (!noChange) {
-      const alertText = `🚨 <b>Market Watchdog Alert</b>\n\n<b>Target:</b> ${targetUrl}\n\n<b>Insights:</b>\n${summary}`;
-      await sendTelegramAlert(alertText);
-    } else {
-      console.log('No major changes detected — skipping alert.');
-    }
-
-    // Upsert current snapshot to Neon regardless, so tomorrow's diff is fresh
-    await client.query(
-      `insert into competitor_snapshots (url, last_content, updated_at)
-       values ($1, $2, now())
-       on conflict (url) do update set last_content = excluded.last_content, updated_at = now()`,
-      [targetUrl, currentContent.substring(0, 8000)]
-    );
-
-    console.log('Watchdog execution complete.');
-  } finally {
-    await client.end();
+  if (!noChange) {
+    const alertText = `🚨 <b>Market Watchdog Alert</b>\n\n<b>Target:</b> ${targetUrl}\n\n<b>Insights:</b>\n${summary}`;
+    await sendTelegramAlert(alertText);
+  } else {
+    console.log('No major changes detected — skipping alert.');
   }
+
+  // Upsert current snapshot to Neon regardless, so tomorrow's diff is fresh
+  await client.query(
+    `insert into competitor_snapshots (url, last_content, updated_at)
+     values ($1, $2, now())
+     on conflict (url) do update set last_content = excluded.last_content, updated_at = now()`,
+    [targetUrl, currentContent.substring(0, 8000)]
+  );
+
+  await client.end();
+  console.log('Watchdog execution complete.');
 }
 
 // Run for a sample URL
