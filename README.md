@@ -11,7 +11,7 @@ reflects what's actually been built and validated, not the original plan.
 
 | Stage | Tool | Status |
 |---|---|---|
-| Trigger | GitHub Actions (daily cron) | Not yet wired up |
+| Trigger | GitHub Actions (daily cron) | ✅ Wired up, tested via manual trigger |
 | Fetch | Jina AI Reader (`r.jina.ai`) | ✅ Validated |
 | Clean | Custom regex cleaner (strips markdown noise) | ✅ Validated |
 | Diff | `diff` npm package (`diffLines`), computed in code | ✅ Validated |
@@ -95,18 +95,45 @@ npm install node-fetch pg diff
 ```
 Add `"type": "module"` to `package.json` (project uses ES module `import` syntax).
 
+## Resolved since initial build
+- **AI-unavailable resilience**: if Gemini fails (rate limit, outage), the
+  pipeline no longer fails silently or leaves the Neon snapshot stale. The
+  Gemini call is isolated in its own try/catch — a failure there still lets
+  today's snapshot save to Neon (so tomorrow's diff compares against today,
+  not a days-old snapshot), and if real changes were detected but couldn't
+  be summarized, a fallback Telegram alert reports the raw added/removed
+  line counts so you know to check manually. The whole pipeline body also
+  now runs inside a try/finally so the Neon connection always closes
+  cleanly, even if an earlier step (e.g. Jina fetch) throws first.
+- **Real target selected**: `wealth.ic.africa/fixed-income` (IC Wealth, a
+  legitimate Ghanaian investment platform — verified against a lookalike
+  scam site using a similar name before picking this one). Replaced the
+  Brevo.com test target used during development.
+- **Neon vs Supabase**: settled on Neon (plain Postgres via the `pg`
+  client) to avoid disrupting existing Supabase projects. `index.js` fully
+  migrated off the Supabase SDK.
+- **Gemini model**: updated from `gemini-1.5-flash` (validated during
+  development, since discontinued) through `gemini-2.0-flash` (deprecated
+  June 2026) to `gemini-3.5-flash`, the current free-tier model as of
+  mid-2026. Worth periodically checking Google AI Studio for whether this
+  is still the correct free-tier model, since this lineup has moved fast.
+
 ## Known limitations / open items
-- Not yet wired into GitHub Actions — currently runs manually via `node index.js`
-- `diffLines` diffs whole lines, not words — a one-word change inside a long
-  paragraph will surface the entire line as changed. Fine for summaries,
-  worth revisiting (`diffWords`) if paragraphs get long on real target sites
-- Not yet tested against a site with dynamic/rotating content (e.g. a
-  reshuffling product carousel) — could produce noisy false-positive diffs
-- Target URL is currently hardcoded (`brevo.com`, used for testing) —
-  swap to real competitor target(s) before automating
-- `dbError` from the snapshot lookup is logged but not yet distinguished
-  between "no row yet" (expected on first run) vs. an actual connection
-  failure — worth tightening before trusting this unattended
+- Target currently tracks a single URL — loop `runWatchdog()` over an
+  array of URLs to monitor multiple competitors
+- `diffLines` diffs whole lines, not words — a one-word change inside a
+  long paragraph will surface the entire line as changed. Fine for
+  summaries, worth revisiting (`diffWords`) if paragraphs get long on real
+  target sites
+- Not yet tested against a site with dynamic/rotating content — the IC
+  Wealth homepage has a retirement calculator with fields that may render
+  differently per fetch even with no real content change (flagged as a
+  possible noise source, not yet confirmed as an actual problem)
+- The `/fixed-income` page was chosen over the homepage on the theory that
+  rate/product changes are more likely there than in marketing copy — not
+  yet confirmed with a real multi-day run
+- Not yet running on a real daily cadence long enough to confirm the
+  8 AM UTC schedule fires reliably day after day without supervision
 
 ## Testing scripts
 Standalone test scripts used during development, kept for reference /

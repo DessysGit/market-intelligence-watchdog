@@ -120,41 +120,67 @@ async function runWatchdog(targetUrl) {
   const client = new Client({ connectionString: DATABASE_URL });
   await client.connect();
 
-  // Get previous snapshot from Neon.
-  const result = await client.query(
-    `select last_content from competitor_snapshots where url = $1`,
-    [targetUrl]
-  );
-  const previousContent = result.rows[0] ? result.rows[0].last_content : '';
+  try {
+    // Get previous snapshot from Neon.
+    const result = await client.query(
+      `select last_content from competitor_snapshots where url = $1`,
+      [targetUrl]
+    );
+    const previousContent = result.rows[0] ? result.rows[0].last_content : '';
 
-  const rawContent = await fetchWebContent(targetUrl);
-  const currentContent = cleanContent(rawContent);
+    const rawContent = await fetchWebContent(targetUrl);
+    const currentContent = cleanContent(rawContent);
 
-  // Compute the diff in code — see computeDiff() comment for why.
-  const { added, removed } = computeDiff(previousContent, currentContent);
+    // Compute the diff in code — see computeDiff() comment for why.
+    const { added, removed } = computeDiff(previousContent, currentContent);
 
-  const summary = await analyzeWithAI(added, removed);
+    // Gemini call is isolated in its own try/catch. If the AI is unavailable
+    // (outage, rate limit, etc.), we still want to:
+    //   1. Save today's snapshot to Neon, so tomorrow's diff compares against
+    //      TODAY's content rather than staying stuck on a stale snapshot.
+    //   2. Tell you via Telegram that something changed but couldn't be
+    //      summarized, rather than failing completely silently.
+    let summary;
+    let aiFailed = false;
+    try {
+      summary = await analyzeWithAI(added, removed);
+    } catch (err) {
+      console.error('Gemini analysis failed:', err.message);
+      aiFailed = true;
+    }
 
-  const noChange = summary.trim().toLowerCase().startsWith('no major changes detected');
+    if (aiFailed) {
+      if (added.length > 0 || removed.length > 0) {
+        const fallbackText = `⚠️ <b>Market Watchdog — AI Unavailable</b>\n\n<b>Target:</b> ${targetUrl}\n\nChanges were detected, but the AI summary could not be generated (Gemini may be rate-limited or down). Check the site manually if this is time-sensitive.\n\n<b>Raw added lines:</b> ${added.length}\n<b>Raw removed lines:</b> ${removed.length}`;
+        await sendTelegramAlert(fallbackText);
+      } else {
+        console.log('AI unavailable, but no changes were detected anyway — nothing to alert on.');
+      }
+    } else {
+      const noChange = summary.trim().toLowerCase().startsWith('no major changes detected');
 
-  if (!noChange) {
-    const alertText = `🚨 <b>Market Watchdog Alert</b>\n\n<b>Target:</b> ${targetUrl}\n\n<b>Insights:</b>\n${summary}`;
-    await sendTelegramAlert(alertText);
-  } else {
-    console.log('No major changes detected — skipping alert.');
+      if (!noChange) {
+        const alertText = `🚨 <b>Market Watchdog Alert</b>\n\n<b>Target:</b> ${targetUrl}\n\n<b>Insights:</b>\n${summary}`;
+        await sendTelegramAlert(alertText);
+      } else {
+        console.log('No major changes detected — skipping alert.');
+      }
+    }
+
+    // Upsert current snapshot to Neon regardless, so tomorrow's diff is fresh
+    await client.query(
+      `insert into competitor_snapshots (url, last_content, updated_at)
+       values ($1, $2, now())
+       on conflict (url) do update set last_content = excluded.last_content, updated_at = now()`,
+      [targetUrl, currentContent.substring(0, 8000)]
+    );
+  } finally {
+    await client.end();
   }
-
-  // Upsert current snapshot to Neon regardless, so tomorrow's diff is fresh
-  await client.query(
-    `insert into competitor_snapshots (url, last_content, updated_at)
-     values ($1, $2, now())
-     on conflict (url) do update set last_content = excluded.last_content, updated_at = now()`,
-    [targetUrl, currentContent.substring(0, 8000)]
-  );
 
   await client.end();
   console.log('Watchdog execution complete.');
 }
 
 // Run for a sample URL
-runWatchdog('https://brevo.com').catch(err => console.error('Watchdog run failed:', err));
+runWatchdog('https://wealth.ic.africa/fixed-income').catch(err => console.error('Watchdog run failed:', err));
