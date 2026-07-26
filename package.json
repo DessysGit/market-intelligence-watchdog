@@ -1,0 +1,26 @@
+{
+  "name": "market-intelligence-watchdog",
+  "version": "1.0.0",
+  "description": "An automated, zero-cost pipeline that tracks a competitor's website daily,\r detects meaningful changes, and sends a plain-language summary to Telegram.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DessysGit/market-intelligence-watchdog.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DessysGit/market-intelligence-watchdog/issues"
+  },
+  "homepage": "https://github.com/DessysGit/market-intelligence-watchdog#readme",
+  "dependencies": {
+    "diff": "^9.0.0",
+    "dotenv": "^17.4.2",
+    "node-fetch": "^3.3.2",
+    "pg": "^8.22.0"
+  }
+}
