@@ -7,7 +7,7 @@
 import pg from 'pg';
 const { Client } = pg;
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_z3aiOo4TWdxg@ep-spring-fire-a6jzqhfm-pooler.us-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+const DATABASE_URL = process.env.DATABASE_URL;
 
 async function testNeon() {
   const client = new Client({ connectionString: DATABASE_URL });
