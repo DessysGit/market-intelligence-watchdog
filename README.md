@@ -15,7 +15,7 @@ reflects what's actually been built and validated, not the original plan.
 | Fetch | Jina AI Reader (`r.jina.ai`) | ✅ Validated |
 | Clean | Custom regex cleaner (strips markdown noise) | ✅ Validated |
 | Diff | `diff` npm package (`diffLines`), computed in code | ✅ Validated |
-| Summarize | Google Gemini 1.5 Flash | ✅ Validated |
+| Summarize | Google Gemini 3.5 Flash | ✅ Validated |
 | Store | Neon (Postgres) | ✅ Validated |
 | Alert | Telegram Bot API (HTML formatting) | ✅ Validated |
 
@@ -67,7 +67,11 @@ only reacts to actual tags.
 - Visit `https://api.telegram.org/bot<TOKEN>/getUpdates` to find your `chat_id`
 
 ### 2. Gemini API key
-- Go to Google AI Studio → Get API Key (free tier, Gemini 1.5 Flash)
+- Go to Google AI Studio → Get API Key (check current free-tier model —
+  this project used `gemini-1.5-flash` during initial development, moved to
+  `gemini-2.0-flash`, and now runs on `gemini-3.5-flash` after two rounds of
+  deprecation; the free-tier lineup has moved fast in 2026, so verify the
+  current model name in AI Studio before assuming this stays accurate)
 
 ### 3. Neon database
 - Create a project at neon.tech, copy the connection string
@@ -133,7 +137,9 @@ Add `"type": "module"` to `package.json` (project uses ES module `import` syntax
   rate/product changes are more likely there than in marketing copy — not
   yet confirmed with a real multi-day run
 - Not yet running on a real daily cadence long enough to confirm the
-  8 AM UTC schedule fires reliably day after day without supervision
+  8 AM UTC schedule fires reliably day after day without supervision —
+  **update: confirmed over several consecutive days, cron fires reliably
+  and correctly skips the alert on no-change days**
 
 ## Testing scripts
 Standalone test scripts used during development, kept for reference /
